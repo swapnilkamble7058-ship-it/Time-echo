@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Time Echo Runner - Commercial Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
+        
+        body {
+            font-family: 'Rajdhani', sans-serif; background-color: #020617; color: #fff;
+            touch-action: none; overflow: hidden; margin: 0; padding: 0;
+            display: flex; flex-direction: column; align-items: center; 
+            height: 100dvh; width: 100vw; user-select: none; -webkit-user-select: none;
+        }
+
+        .neon-title { text-shadow: 0 0 10px #0ea5e9, 0 0 20px #0284c7; color: #e0f2fe; letter-spacing: 2px; }
+        
+        #game-wrapper {
+            position: relative; width: 100%; max-width: 800px; height: 100%;
+            display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(14, 165, 233, 0.1); background: #000;
+        }
+
+        #screens-container {
+            flex: 1; position: relative; overflow: hidden;
+            display: flex; flex-direction: column; min-height: 0;
+        }
+
+        .scanlines {
+            position: absolute; inset: 0; pointer-events: none; z-index: 100;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%; opacity: 0.35;
+        }
+
+        .screen {
+            position: absolute; inset: 0; display: none; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%); z-index: 20; width: 100%; height: 100%;
+        }
+        
+        #screen-game { display: none; flex-direction: column; width: 100%; height: 100%; background: #000; position: relative; }
+        .screen.active, #screen-game.active { display: flex; }
+        
+        #canvas-container {
+            flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center;
+            background: #050505; border-bottom: 2px solid #1e293b; position: relative; overflow: hidden;
+        }
+        canvas { max-width: 100%; max-height: 100%; aspect-ratio: 16/9; object-fit: contain; transition: transform 0.1s; }
+        .shake { transform: translate(5px, 5px); } .shake2 { transform: translate(-5px, -5px); }
+        
+        .btn-menu {
+            background: rgba(14, 165, 233, 0.1); border: 2px solid #0ea5e9; color: #bae6fd;
+            font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: bold;
+            padding: 12px 30px; margin: 8px; border-radius: 8px; cursor: pointer;
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.3), inset 0 0 10px rgba(14, 165, 233, 0.2);
+            transition: all 0.2s ease; text-transform: uppercase; letter-spacing: 1px; width: 280px;
+        }
+        .btn-menu:active { transform: scale(0.95); background: rgba(14, 165, 233, 0.4); }
+        .btn-menu[style*="visibility: hidden"] { pointer-events: none; }
+
+        #level-grid {
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px; 
+            width: 90%; max-width: 800px; 
+            max-height: 65vh; overflow-y: auto;
+            padding: 15px; 
+            background: rgba(15, 23, 42, 0.9); 
+            border-radius: 16px; border: 2px solid rgba(14, 165, 233, 0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+        @media (min-width: 480px) { #level-grid { grid-template-columns: repeat(5, 1fr); gap: 18px; padding: 20px; } }
+        @media (min-width: 768px) { #level-grid { grid-template-columns: repeat(7, 1fr); gap: 20px; padding: 25px; } }
+        #level-grid::-webkit-scrollbar { width: 6px; } 
+        #level-grid::-webkit-scrollbar-thumb { background: #0ea5e9; border-radius: 4px; box-shadow: 0 0 10px #0ea5e9; }
+        
+        .lvl-btn { 
+            aspect-ratio: 1; border-radius: 12px; font-family: 'Rajdhani', sans-serif; font-size: 32px;
+            font-weight: bold; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            border: 2px solid transparent; transition: 0.2s; 
+        }
+        .lvl-btn.unlocked { background: rgba(14, 165, 233, 0.2); border-color: #0ea5e9; color: #e0f2fe; box-shadow: 0 0 15px rgba(14, 165, 233, 0.4); }
+        .lvl-btn.unlocked:active { transform: scale(0.9); background: rgba(14, 165, 233, 0.5); }
+        .lvl-btn.locked { background: rgba(30, 41, 59, 0.7); border-color: #334155; color: #475569; cursor: not-allowed; font-size: 24px; }
+
+        .setting-row { display: flex; justify-content: space-between; align-items: center; width: 320px; margin: 10px 0; font-size: 20px; color: #cbd5e1; }
+        .toggle-btn { background: #1e293b; border: 1px solid #475569; color: #94a3b8; padding: 6px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .toggle-btn.on { background: rgba(34, 197, 94, 0.2); border-color: #22c55e; color: #4ade80; box-shadow: 0 0 10px rgba(34, 197, 94, 0.3); }
+
+        #game-ui { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 15px; background: #0f172a; border-bottom: 1px solid #1e293b; z-index: 10; width: 100%; }
+        .hud-btn { background: rgba(0, 0, 0, 0.6); border: 2px solid #cbd5e1; color: #cbd5e1; padding: 5px 12px; border-radius: 6px; font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+        .hud-btn:active { background: rgba(255, 255, 255, 0.2); }
+        .btn-idea { border-color: #facc15; color: #fef08a; background: rgba(250, 204, 21, 0.1); box-shadow: 0 0 10px rgba(250, 204, 21, 0.3); }
+        .btn-idea:active { background: rgba(250, 204, 21, 0.3); }
+        .btn-idea-free { border-color: #22c55e; color: #86efac; background: rgba(34, 197, 94, 0.1); box-shadow: 0 0 10px rgba(34, 197, 94, 0.3); }
+        .btn-idea-free:active { background: rgba(34, 197, 94, 0.3); }
+
+        #mobile-controls { flex-shrink: 0; display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 15px; background: #0b0f19; width: 100%; border-top: 1px solid #1e293b; z-index: 10; }
+        .left-controls { display: flex; gap: 8px; }
+        .right-controls { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+        .touch-wrapper { padding: 5px; margin: -5px; }
+        .btn-ctrl { background: rgba(30, 41, 59, 0.8); border: 2px solid #475569; color: #cbd5e1; font-size: 26px; border-radius: 50%; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .btn-ctrl:active { background: rgba(14, 165, 233, 0.3); border-color: #0ea5e9; color: #0ea5e9; box-shadow: 0 0 20px rgba(14, 165, 233, 0.5); transform: scale(0.95); }
+        .btn-jump { width: 75px; height: 75px; font-weight: bold; font-size: 18px; border-color: #ec4899; color: #f472b6; border-radius: 50%; }
+        .btn-jump:active { background: rgba(236, 72, 153, 0.3); box-shadow: 0 0 20px rgba(236, 72, 153, 0.6); }
+        .echo-row { display: flex; gap: 8px; align-items: center; }
+        .btn-echo { width: 110px; height: 40px; font-size: 14px; font-weight: bold; background: rgba(14, 165, 233, 0.2); border: 2px solid #0ea5e9; color: #38bdf8; border-radius: 20px; box-shadow: 0 0 15px rgba(14, 165, 233, 0.4); display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-echo:active { background: rgba(14, 165, 233, 0.5); transform: scale(0.95); }
+        .btn-clear { width: 40px; height: 40px; font-size: 18px; font-weight: bold; background: rgba(239, 68, 68, 0.2); border: 2px solid #ef4444; color: #fca5a5; border-radius: 50%; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); display: flex; align-items: center; justify-content: center; }
+        .btn-clear:active { background: rgba(239, 68, 68, 0.5); transform: scale(0.95); }
+
+        .ad-container-bottom { flex-shrink: 0; width: 100%; height: 50px; background: #020617; display: flex; justify-content: center; align-items: center; color: #475569; font-size: 12px; font-weight: bold; letter-spacing: 1px; border-top: 1px solid #1e293b; z-index: 40; }
+        .ad-box-square { width: 300px; height: 250px; background: rgba(30, 41, 59, 0.5); border: 1px dashed #475569; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 14px; margin: 15px 0; }
+        .ad-box-small { width: 300px; height: 100px; background: rgba(30, 41, 59, 0.5); border: 1px dashed #475569; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 14px; margin: 15px 0; }
+
+        .overlay-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; text-align: center; padding: 20px; }
+        .hidden { display: none !important; }
+        .gem-counter { background: rgba(0,0,0,0.5); border: 1px solid #facc15; color: #fef08a; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 18px; box-shadow: 0 0 10px rgba(250, 204, 21, 0.2); }
+        .idea-box { background: rgba(15, 23, 42, 0.95); border: 2px solid #facc15; padding: 20px; border-radius: 12px; box-shadow: 0 0 30px rgba(250, 204, 21, 0.3); max-width: 90%; text-align: center; }
+        #toast-msg { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); border: 2px solid #facc15; color: #fef08a; padding: 8px 20px; border-radius: 30px; font-weight: bold; font-size: 16px; box-shadow: 0 0 20px rgba(250, 204, 21, 0.5); z-index: 60; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div class="scanlines"></div>
+    
+    <div id="screens-container">
+        
+        <div id="screen-menu" class="screen active">
+            <div class="absolute top-4 right-4 gem-counter">💎 <span class="gem-count-text">50</span></div>
+            <h1 class="text-6xl font-bold neon-title mb-2 text-center leading-none">TIME<br>ECHO</h1>
+            <p class="text-cyan-600 mb-4 tracking-[0.2em] text-sm">COMMERCIAL EDITION</p>
+            
+            <div class="ad-box-small">ADVERTISEMENT (300x100)</div>
+
+            <button class="btn-menu mt-2" onclick="showLevelScreen()" style="border-color: #22c55e; color: #86efac; padding: 15px;">▶ PLAY GAME</button>
+            <button class="btn-menu" onclick="showScreen('screen-shop')" style="border-color: #facc15; color: #fef08a; padding: 10px;">🛒 SHOP / GEMS</button>
+            <button class="btn-menu" onclick="showScreen('screen-settings')" style="font-size: 20px; padding: 10px;">⚙️ SETTINGS</button>
+        </div>
+
+        <div id="screen-levels" class="screen">
+            <div class="absolute top-4 right-4 gem-counter">💎 <span class="gem-count-text">50</span></div>
+            <h2 class="text-4xl font-bold text-slate-200 mb-2" style="text-shadow: 0 0 10px rgba(255,255,255,0.3);">MISSIONS</h2>
+            <h3 class="text-2xl font-bold text-sky-400 mb-4 tracking-wider" id="level-page-title">1 TO 30</h3>
+            
+            <div id="level-grid"></div>
+
+            <div style="display: flex; gap: 15px; margin-top: 20px;">
+                <button class="btn-menu" id="btn-prev-page" onclick="changeLevelPage(-1)" style="width: auto; padding: 10px 25px; font-size: 18px;">◀ PREV</button>
+                <button class="btn-menu" id="btn-next-page" onclick="changeLevelPage(1)" style="width: auto; padding: 10px 25px; font-size: 18px;">NEXT ▶</button>
+            </div>
+
+            <button class="btn-menu mt-4" onclick="showScreen('screen-menu')" style="width: auto; padding: 10px 40px;">MAIN MENU</button>
+        </div>
+
+        <div id="screen-shop" class="screen">
+            <div class="absolute top-4 right-4 gem-counter">💎 <span class="gem-count-text">50</span></div>
+            <h2 class="text-4xl font-bold text-yellow-400 mb-6" style="text-shadow: 0 0 15px rgba(250,204,21,0.4);">GEM SHOP</h2>
+            
+            <div class="ad-box-small mb-4">ADVERTISEMENT (300x100)</div>
+
+            <button class="btn-menu" onclick="watchAdForGems()" style="border-color: #3b82f6; color: #93c5fd; font-size: 20px;">📺 WATCH AD (+20 💎)</button>
+            <button class="btn-menu" onclick="buyGems()" style="border-color: #22c55e; color: #86efac; font-size: 20px;">💳 BUY 100 💎 ($0.99)</button>
+            
+            <button class="btn-menu mt-6" onclick="showScreen('screen-menu')" style="width: auto;">MAIN MENU</button>
+        </div>
+
+        <div id="screen-settings" class="screen">
+            <h2 class="text-4xl font-bold text-slate-200 mb-8" style="text-shadow: 0 0 10px rgba(255,255,255,0.3);">SYSTEM SETTINGS</h2>
+            <div class="setting-row"><span>SFX (AUDIO)</span><button id="tog-sfx" class="toggle-btn on" onclick="toggleSetting('sfx')">ON</button></div>
+            <div class="setting-row"><span>HIGH GRAPHICS</span><button id="tog-gfx" class="toggle-btn on" onclick="toggleSetting('gfx')">ON</button></div>
+            <div class="setting-row" style="margin-top: 10px; border-top: 1px solid #334155; padding-top: 15px;">
+                <span>PLAYER SPEED</span><button id="tog-speed" class="toggle-btn on" onclick="toggleSpeed()">NORMAL</button>
+            </div>
+            
+            <button class="btn-menu mt-8" onclick="resetGameProgress()" style="border-color: #ef4444; color: #fca5a5; background: rgba(239, 68, 68, 0.2); width: auto;">🔴 RESET GAME PROGRESS</button>
+            
+            <button class="btn-menu mt-8" onclick="showScreen('screen-menu')" style="width: auto;">MAIN MENU</button>
+        </div>
+
+        <div id="screen-game">
+            
+            <div id="game-ui">
+                <div class="flex-1 flex justify-start">
+                    <button class="hud-btn" onclick="toggleFullScreen()" style="padding: 5px 12px; margin-right: 8px;" title="Fullscreen">🖵</button>
+                    <button class="hud-btn btn-pause" onclick="pauseGame()" style="padding: 5px 18px;">||</button>
+                </div>
+                <div class="flex-1 flex flex-col items-center text-center">
+                    <h2 id="ui-lvl-title" class="text-lg font-bold text-sky-300 m-0 leading-none drop-shadow-md">LEVEL 1</h2>
+                    <div class="text-yellow-400 text-sm font-bold mt-1">💎 <span class="gem-count-text">50</span></div>
+                </div>
+                <div class="flex-1 flex justify-end">
+                    <button class="hud-btn btn-idea" id="btn-open-idea" onclick="openIdea()">💡 IDEA (20 💎)</button>
+                </div>
+            </div>
+
+            <div id="canvas-container">
+                <canvas id="gameCanvas"></canvas>
+                <div id="toast-msg">🌟 Golden Shadow is showing the way!</div>
+
+                <div id="overlay-idea" class="overlay-dim hidden">
+                    <div class="idea-box">
+                        <h2 class="text-3xl font-bold text-yellow-400 mb-4" id="idea-title">💡 USE A HINT?</h2>
+                        <p class="text-white text-xl mb-6" id="idea-text">It will cost 20 💎 to reveal the solution.</p>
+                        <div style="display: flex; justify-content: center; gap: 10px;" id="idea-buttons"></div>
+                    </div>
+                </div>
+
+                <div id="overlay-pause" class="overlay-dim hidden">
+                    <h2 class="text-4xl font-bold text-white mb-2">GAME PAUSED</h2>
+                    <div class="ad-box-square">ADVERTISEMENT (300x250)</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-menu" onclick="resumeGame()" style="width: auto; font-size: 18px;">RESUME</button>
+                        <button class="btn-menu" onclick="quitToMenu()" style="width: auto; border-color: #ef4444; color: #fca5a5; font-size: 18px;">MAIN MENU</button>
+                    </div>
+                </div>
+
+                <div id="overlay-win" class="overlay-dim hidden">
+                    <h2 class="text-5xl font-bold text-green-400 mb-2" style="text-shadow: 0 0 20px #4ade80;">LEVEL CLEARED!</h2>
+                    <p class="text-yellow-400 text-xl font-bold mb-4 drop-shadow-md" id="win-bonus-text">+5 💎 NEON GEMS EARNED!</p>
+                    <button id="btn-next-level" class="btn-menu mb-4" onclick="nextLevel()" style="border-color: #22c55e; color: #86efac;">NEXT LEVEL</button>
+                    <button class="btn-menu" onclick="quitToMenu()" style="font-size: 16px;">MAIN MENU</button>
+                </div>
+                
+                <div id="overlay-death" class="overlay-dim hidden" style="background: rgba(220, 38, 38, 0.4);">
+                    <h2 class="text-6xl font-bold text-red-500 mb-2" style="text-shadow: 0 0 20px #dc2626;">YOU DIED!</h2>
+                    <p class="text-white mb-8 text-xl" id="death-reason">You failed the level.</p>
+                </div>
+            </div>
+
+            <div id="mobile-controls">
+                <div class="left-controls">
+                    <div class="touch-wrapper"><button class="btn-ctrl" id="btn-left">◀</button></div>
+                    <div class="touch-wrapper"><button class="btn-ctrl" id="btn-right">▶</button></div>
+                </div>
+                <div class="right-controls">
+                    <div class="echo-row">
+                        <div class="touch-wrapper"><button class="btn-clear" id="btn-clear-echoes">✖</button></div>
+                        <div class="touch-wrapper"><button class="btn-echo" id="btn-restart-echo">⟲ SAVE ECHO</button></div>
+                    </div>
+                    <div class="touch-wrapper"><button class="btn-ctrl btn-jump" id="btn-jump">JUMP</button></div>
+                </div>
+            </div>
+
+        </div> 
+    </div> 
+    
+    <div class="ad-container-bottom">
+        ADVERTISEMENT BANNER (320x50)
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 🎨 ASSET MANAGEMENT SYSTEM
+    // ==========================================
+    const images = {
+        player: new Image(),       
+        playerEcho: new Image(),   
+        platform: new Image(),     
+        spike: new Image(),        
+        doorOpen: new Image(),     
+        doorClosed: new Image(),   
+        block: new Image(),        
+        background: new Image()    
+    };
+
+    // --- ANTI-BLUR CANVAS SCALING ---
+    const canvas = document.getElementById('gameCanvas'); 
+    const ctx = canvas.getContext('2d');
+    const logicalWidth = 800; 
+    const logicalHeight = 450; 
+
+    function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = logicalWidth * dpr;
+        canvas.height = logicalHeight * dpr;
+        ctx.scale(dpr, dpr);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // --- GEMS & PROGRESS SYSTEM ---
+    let playerGems = 50; 
+    let hintActive = false; let hintProgress = 0;
+    let maxUnlockedLevel = 0;
+    const TOTAL_LEVELS = 200;
+    
+    // SAFE PARSING LOGIC: Prevents array/parsing crashes
+    let unlockedHints = []; 
+
+    function saveGame() {
+        localStorage.setItem('te_gems_final', playerGems);
+        localStorage.setItem('te_level_final', maxUnlockedLevel);
+        localStorage.setItem('te_hints_unlocked', JSON.stringify(unlockedHints));
+    }
+    
+    function loadGame() {
+        try {
+            if(localStorage.getItem('te_level_final') !== null) {
+                maxUnlockedLevel = parseInt(localStorage.getItem('te_level_final')) || 0;
+                playerGems = parseInt(localStorage.getItem('te_gems_final')) || 0;
+                let storedHints = localStorage.getItem('te_hints_unlocked');
+                unlockedHints = storedHints ? JSON.parse(storedHints) : [];
+            } else {
+                maxUnlockedLevel = 0;
+                playerGems = 50;
+                unlockedHints = [];
+            }
+        } catch(e) {
+            console.error("Save Load Error Fixed:", e);
+            maxUnlockedLevel = 0; playerGems = 50; unlockedHints = [];
+        }
+    }
+    loadGame(); 
+
+    function resetGameProgress() {
+        if(confirm("Are you sure you want to reset all your progress and lock the levels?")) {
+            maxUnlockedLevel = 0;
+            playerGems = 50;
+            currentLevelPage = 0;
+            unlockedHints = [];
+            saveGame();
+            updateGemsUI();
+            showToast("Progress Reset. Levels Locked!");
+            showScreen('screen-menu');
+        }
+    }
+
+    function watchAdForGems() {
+        showToast("Playing Ad... ⏳");
+        setTimeout(() => { playerGems += 20; saveGame(); updateGemsUI(); showToast("Rewarded +20 Gems! 💎"); }, 2000);
+    }
+    function buyGems() {
+        playerGems += 100; saveGame(); updateGemsUI(); showToast("Purchase Successful! +100 💎");
+    }
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(e => console.log(e)); } 
+        else { if (document.exitFullscreen) document.exitFullscreen(); }
+    }
+    
+    function updateGemsUI() { 
+        document.querySelectorAll('.gem-count-text').forEach(el => { el.textContent = playerGems; }); 
+        
+        const btnIdea = document.getElementById('btn-open-idea');
+        if ((unlockedHints || []).includes(currentLevelIdx)) {
+            btnIdea.textContent = "💡 FREE HINT";
+            btnIdea.className = "hud-btn btn-idea-free";
+        } else {
+            btnIdea.textContent = "💡 IDEA (20 💎)";
+            btnIdea.className = "hud-btn btn-idea";
+        }
+    }
+    
+    function showToast(msg, isError = false) {
+        const toast = document.getElementById('toast-msg'); toast.textContent = msg;
+        toast.style.borderColor = isError ? '#ef4444' : '#facc15'; toast.style.color = isError ? '#fca5a5' : '#fef08a';
+        toast.style.boxShadow = isError ? '0 0 15px rgba(239,68,68,0.5)' : '0 0 15px rgba(250,204,21,0.5)';
+        toast.style.opacity = '1'; setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+    }
+    
+    // --- HINT LOGIC ---
+    function openIdea() {
+        if(gameState !== 'playing') return;
+        
+        if ((unlockedHints || []).includes(currentLevelIdx)) {
+            activateIdea(true); 
+            return;
+        }
+
+        const ideaText = document.getElementById('idea-text'); 
+        const ideaTitle = document.getElementById('idea-title');
+        const ideaBtns = document.getElementById('idea-buttons');
+        
+        if(playerGems >= 20) {
+            ideaTitle.textContent = "💡 USE A HINT?"; 
+            ideaTitle.className = "text-3xl font-bold text-yellow-400 mb-4"; 
+            ideaText.textContent = "It will cost 20 💎 to unlock the hint for this level permanently.";
+            ideaBtns.innerHTML = `
+                <button class="btn-menu" onclick="activateIdea(false)" style="width: auto; padding: 10px 20px; border-color: #facc15; color: #fef08a;">YES (-20 💎)</button>
+                <button class="btn-menu" onclick="cancelIdea()" style="width: auto; padding: 10px 20px; border-color: #ef4444; color: #fca5a5;">CANCEL</button>
+            `;
+        } else {
+            ideaTitle.textContent = "❌ OUT OF GEMS!"; 
+            ideaTitle.className = "text-3xl font-bold text-red-500 mb-4";
+            ideaText.textContent = "You need 20 💎 for a hint. Visit the Shop to get more!";
+            ideaBtns.innerHTML = `
+                <button class="btn-menu" onclick="goToShopFromHint()" style="width: auto; padding: 10px 20px; border-color: #22c55e; color: #86efac; font-size: 16px;">🛒 GO TO SHOP</button>
+                <button class="btn-menu" onclick="cancelIdea()" style="width: auto; padding: 10px 20px; border-color: #ef4444; color: #fca5a5; font-size: 16px;">CLOSE</button>
+            `;
+        }
+        gameState = 'paused'; document.getElementById('overlay-idea').classList.remove('hidden');
+    }
+
+    function activateIdea(isFree) {
+        if(!isFree && playerGems >= 20) {
+            playerGems -= 20; 
+            unlockedHints.push(currentLevelIdx); 
+            saveGame();
+        }
+        
+        updateGemsUI(); 
+        document.getElementById('overlay-idea').classList.add('hidden'); 
+        gameState = 'playing'; keys.left = false; keys.right = false;
+        
+        if (currentLevel.hintPaths && currentLevel.hintPaths.length > 0) {
+            hintActive = true; hintProgress = 0; playSound('key'); 
+            showToast("🌟 Watch the Golden Shadow closely!", false);
+        } else {
+            showToast("💡 " + currentLevel.hint, false);
+        }
+    }
+
+    function cancelIdea() {
+        document.getElementById('overlay-idea').classList.add('hidden'); 
+        gameState = 'playing'; keys.left = false; keys.right = false;
+    }
+    function goToShopFromHint() { document.getElementById('overlay-idea').classList.add('hidden'); quitToMenu(); showScreen('screen-shop'); }
+
+    // --- AUDIO SYSTEM ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+        if (navigator.vibrate) {
+            if (type === 'jump' || type === 'button') navigator.vibrate(15);
+            else if (type === 'die') navigator.vibrate([50, 50, 50]);
+            else if (type === 'win') navigator.vibrate([100, 50, 100]);
+        }
+        if (!settings.sfx) return; if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+        osc.connect(gainNode); gainNode.connect(audioCtx.destination); const now = audioCtx.currentTime;
+        if (type === 'jump') { osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(800, now + 0.1); gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(now); osc.stop(now + 0.1); } 
+        else if (type === 'button') { osc.type = 'square'; osc.frequency.setValueAtTime(800, now); osc.frequency.setValueAtTime(1200, now + 0.05); gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.1); osc.start(now); osc.stop(now + 0.1); } 
+        else if (type === 'die') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.4); gainNode.gain.setValueAtTime(0.4, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.4); osc.start(now); osc.stop(now + 0.4); } 
+        else if (type === 'win') { osc.type = 'square'; osc.frequency.setValueAtTime(500, now); osc.frequency.setValueAtTime(750, now + 0.1); osc.frequency.setValueAtTime(1000, now + 0.2); gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.4); osc.start(now); osc.stop(now + 0.4); } 
+        else if (type === 'teleport') { osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.linearRampToValueAtTime(1500, now + 0.2); gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.2); osc.start(now); osc.stop(now + 0.2); }
+        else if (type === 'clear') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, now); osc.frequency.linearRampToValueAtTime(100, now + 0.2); gainNode.gain.setValueAtTime(0.3, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.2); osc.start(now); osc.stop(now + 0.2); }
+        else if (type === 'key') { osc.type = 'sine'; osc.frequency.setValueAtTime(1200, now); osc.frequency.setValueAtTime(1600, now + 0.1); gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.2); osc.start(now); osc.stop(now + 0.2); }
+    }
+
+    // --- GAME SETTINGS ---
+    const settings = { sfx: true, gfx: true, speed: 5 }; const speedModes = ['SLOW', 'NORMAL', 'FAST']; const speedValues = [4, 5, 6]; 
+    let currentSpeedIdx = 1; let gameLoopId; 
+    
+    function toggleSetting(key) { settings[key] = !settings[key]; const btn = document.getElementById(`tog-${key}`); btn.textContent = settings[key] ? "ON" : "OFF"; btn.className = settings[key] ? "toggle-btn on" : "toggle-btn"; if(key === 'gfx' && !settings.gfx) particles = []; else if (key === 'gfx' && settings.gfx) initParticles(); }
+    function toggleSpeed() { currentSpeedIdx = (currentSpeedIdx + 1) % 3; settings.speed = speedValues[currentSpeedIdx]; const btn = document.getElementById('tog-speed'); btn.textContent = speedModes[currentSpeedIdx]; if (currentSpeedIdx === 0) { btn.className = "toggle-btn"; btn.style.color = "#facc15"; btn.style.borderColor = "#eab308"; btn.style.background = "rgba(234, 179, 8, 0.2)"; } else if (currentSpeedIdx === 1) { btn.className = "toggle-btn on"; btn.style.color = ""; btn.style.borderColor = ""; btn.style.background = ""; } else { btn.className = "toggle-btn"; btn.style.color = "#f87171"; btn.style.borderColor = "#ef4444"; btn.style.background = "rgba(239, 68, 68, 0.2)"; } }
+
+    // --- LEVEL DATA GENERATION ---
+    const levelData = [];
+
+    function generateLevels() {
+        levelData.push({ theme: 'void', title: "LEVEL 1", sub: "FIRST STEP", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:800,h:50, type:'static'}, {x:300,y:280,w:150,h:20, type:'static'}, {x:150,y:340,w:80,h:20, type:'static'} ], buttons: [ {id: 'A', x:360, y:270, w:30, h:10, type:'hold'} ], door: {x:700, y:320, w:60, h:80, req:['A']}, lasers: [], blocks: [], teleporters: [], hazards: [], spikes: [], keys: [], hint: "Stand on the pink button, then press 'SAVE ECHO'! Your clone will stay there and open the path.", hintPaths: [ [ {x:50, y:340}, {x:150, y:340}, {x:360, y:260, jump: true} ] ] });
+        levelData.push({ theme: 'acid', title: "LEVEL 2", sub: "REVERSE TOGGLE", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:800,h:50, type:'static'}, {x:200,y:280,w:80,h:20, type:'static'}, {x:400,y:280,w:80,h:20, type:'static'} ], buttons: [ {id: 'A', x:225, y:270, w:30, h:10, type:'toggle'}, {id: 'B', x:425, y:270, w:30, h:10, type:'toggle'} ], door: {x:700, y:320, w:60, h:80, req:['A','B'], ordered:true}, lasers: [], blocks: [], teleporters: [], hazards: [], spikes: [], keys: [], hint: "Press Button A first, then Press B. Sequence matters!", hintPaths: [ [ {x:50,y:340}, {x:225,y:270, jump:true} ], [ {x:50,y:340}, {x:425,y:270, jump:true}, {x:700,y:320, jump:true} ] ] });
+        levelData.push({ theme: 'lava', title: "LEVEL 3", sub: "PRESSURE PLATE PAIR", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:800,h:50, type:'static'}, {x:200,y:340,w:80,h:20, type:'static'}, {x:500,y:340,w:80,h:20, type:'static'} ], buttons: [ {id: 'A', x:225, y:330, w:30, h:10, type:'hold'}, {id: 'B', x:525, y:330, w:30, h:10, type:'hold'} ], door: {x:700, y:320, w:60, h:80, req:['A','B']}, lasers: [], blocks: [], teleporters: [], hazards: [{x:300,y:430,w:180,h:20,color:'#ef4444'}], spikes: [], keys: [], hint: "Both buttons must be held down. Put an Echo on one.", hintPaths: [] });
+        levelData.push({ theme: 'void', title: "LEVEL 4", sub: "TIMED SWITCH", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:800,h:50, type:'static'}, {x:150,y:250,w:80,h:20, type:'static'} ], buttons: [ {id: 'A', x:175, y:240, w:30, h:10, type:'timed', time: 100} ], door: {x:700, y:320, w:60, h:80, req:['A']}, lasers: [], blocks: [], teleporters: [], hazards: [], spikes: [], keys: [], hint: "Blue buttons have a timer! Set an Echo to press it while you run to the door.", hintPaths: [] });
+        levelData.push({ theme: 'acid', title: "LEVEL 5", sub: "MULTI-STAGE", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:800,h:50, type:'static'}, {x:300,y:300,w:80,h:20, type:'static'} ], buttons: [ {id: 'A', x:325, y:290, w:30, h:10, type:'hold'}, {id: 'B', x:500, y:390, w:30, h:10, type:'hold'} ], door: {x:700, y:320, w:60, h:80, req:['B']}, lasers: [ {x:450, y:200, w:10, h:200, req:['A']} ], blocks: [], teleporters: [], hazards: [], spikes: [], keys: [], hint: "Use an Echo on Button A to disable the laser. Then you can reach Button B.", hintPaths: [] });
+        
+        levelData.push({ theme: 'lava', title: "LEVEL 6", sub: "PLATFORM LIFT", start: {x: 50, y: 200}, platforms: [ {x:0,y:260,w:150,h:200, type:'static'}, {x:200,y:260,w:100,h:20, type:'movingV', startY: 260, endY: 100, speed: 1.5, req:'A'}, {x:400,y:100,w:400,h:350, type:'static'} ], buttons: [ {id: 'A', x:80, y:250, w:30, h:10, type:'hold'} ], door: {x:700, y:20, w:60, h:80, req:[]}, lasers: [], blocks: [], teleporters: [], hazards: [{x:150,y:430,w:650,h:20,color:'#ef4444'}], spikes: [], keys: [], hint: "The lift only moves if the button is held. Let your Echo do the holding.", hintPaths: [ [ {x:50, y:260}, {x:80, y:260, jump: false} ] ] });
+        
+        levelData.push({ theme: 'void', title: "LEVEL 7", sub: "LASER GATE", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:800,h:50, type:'static'} ], buttons: [ {id: 'A', x:200, y:390, w:30, h:10, type:'hold'}, {id: 'B', x:500, y:390, w:30, h:10, type:'hold'} ], door: {x:700, y:320, w:60, h:80, req:['B']}, lasers: [ {x:350, y:200, w:10, h:200, req:['A']} ], blocks: [], teleporters: [], hazards: [], spikes: [], keys: [], hint: "Lasers are deadly! Send an Echo to turn it off.", hintPaths: [] });
+        levelData.push({ theme: 'acid', title: "LEVEL 8", sub: "ELEVATOR TEAM", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:150,h:50, type:'static'}, {x:200,y:400,w:80,h:20, type:'movingV', startY: 400, endY: 200, speed: 1.5, req:'A'}, {x:350,y:400,w:80,h:20, type:'movingV', startY: 400, endY: 200, speed: 1.5, req:'B'}, {x:500,y:200,w:300,h:250, type:'static'} ], buttons: [ {id: 'A', x:80, y:390, w:30, h:10, type:'hold'}, {id: 'B', x:225, y:390, w:30, h:10, type:'hold'} ], door: {x:700, y:120, w:60, h:80, req:[]}, lasers: [], blocks: [], teleporters: [], hazards: [{x:150,y:430,w:350,h:20,color:'#22c55e'}], spikes: [], keys: [], hint: "You can stand on Lift A while pressing Button B! Use Echoes wisely.", hintPaths: [] });
+        levelData.push({ theme: 'lava', title: "LEVEL 9", sub: "PUSH BLOCK", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:800,h:50, type:'static'} ], buttons: [ {id: 'A', x:400, y:390, w:40, h:10, type:'hold'} ], door: {x:700, y:320, w:60, h:80, req:['A']}, lasers: [], blocks: [{x: 200, y: 360, w: 40, h: 40}], teleporters: [], hazards: [], spikes: [], keys: [], hint: "Push the grey block onto the button. Blocks can hold buttons for you!", hintPaths: [] });
+        levelData.push({ theme: 'void', title: "LEVEL 10", sub: "TELEPORTER SYNC", start: {x: 50, y: 340}, platforms: [ {x:0,y:400,w:200,h:50, type:'static'}, {x:600,y:400,w:200,h:50, type:'static'}, {x:300,y:150,w:200,h:20, type:'static'} ], buttons: [ {id: 'A', x:385, y:140, w:30, h:10, type:'hold'} ], door: {x:700, y:320, w:60, h:80, req:['A']}, lasers: [], blocks: [], teleporters: [{x: 100, y: 360, tx: 350, ty: 100}], hazards: [{x:200,y:430,w:400,h:20,color:'#eab308'}], spikes: [], keys: [], hint: "Enter the Purple Gate to teleport. Set an Echo up there.", hintPaths: [] });
+
+        for(let i = 10; i < TOTAL_LEVELS - 1; i++) {
+            let themes = ['acid', 'lava', 'void']; 
+            let theme = themes[i % 3]; 
+            let hColor = theme === 'acid' ? '#22c55e' : (theme === 'lava' ? '#ef4444' : '#6b21a8');
+            let diff = Math.floor(i / 20); 
+
+            let lvl = { 
+                theme: theme, title: `LEVEL ${i+1}`, sub: `ZONE ${Math.floor(i/10) + 1}-${(i%10) + 1}`, 
+                start: {x: 50, y: 300}, 
+                platforms: [{x:0,y:360,w:250,h:100, type:'static'}, {x:550,y:360,w:250,h:100, type:'static'}], 
+                buttons: [], door: {x:700, y:280, w:60, h:80, req:[]}, lasers: [], blocks: [], teleporters: [], 
+                hazards: [{x:200,y:430,w:350,h:20,color:hColor}], spikes: [], keys: [], 
+                hint: "Analyze the obstacle pattern and execute.", hintPaths: [] 
+            };
+            
+            let type = i % 7; 
+
+            if (type === 0) { 
+                lvl.platforms.push({x:260, y:300, w:100, h:20, type:'movingH', startX:260, endX:350, speed:1.5 + (diff*0.1), req:null}); 
+                lvl.platforms.push({x:400, y:200, w:100, h:20, type:'movingH', startX:400, endX:480, speed:-(1.5 + (diff*0.1)), req:null}); 
+                lvl.buttons.push({id: 'A', x:440, y:190, w:30, h:10, type:'toggle'}); 
+                lvl.door.req = ['A'];
+                if(diff > 2) lvl.spikes.push({x:280, y:400, w:100, h:30});
+            } 
+            else if (type === 1) { 
+                lvl.platforms.push({x:200, y:360, w:400, h:100, type:'static'}); lvl.hazards = []; 
+                lvl.blocks.push({x:250, y:320, w:40, h:40}); 
+                lvl.buttons.push({id: 'A', x:450, y:350, w:40, h:10, type:'hold'}); 
+                lvl.lasers.push({x:520, y:160, w:10, h:200, req:['A']});
+                if(diff > 4) {
+                    lvl.buttons.push({id: 'B', x:350, y:350, w:30, h:10, type:'toggle'});
+                    lvl.lasers.push({x:580, y:160, w:10, h:200, req:['B']});
+                } 
+            } 
+            else if (type === 2) { 
+                lvl.platforms.push({x:280, y:360, w:120, h:20, type:'movingV', startY:360, endY:150, speed:1.5+(diff*0.1), req:'A'}); 
+                lvl.buttons.push({id: 'A', x:150, y:350, w:30, h:10, type:'hold'}); 
+                lvl.teleporters.push({x:320, y:320, tx: 550, ty:320}); 
+                lvl.door.req = []; 
+                if(diff > 1) lvl.spikes.push({x:400, y:400, w:150, h:30});
+            }
+            else if (type === 3) {
+                lvl.platforms.push({x:250, y:250, w:80, h:20, type:'static'}, {x:360, y:150, w:80, h:20, type:'static'}, {x:480, y:280, w:80, h:20, type:'static'});
+                lvl.keys.push({x:280, y:220}, {x:390, y:120});
+                lvl.door.reqKeys = 2;
+                if(diff > 5) { lvl.keys.push({x:500, y:250}); lvl.door.reqKeys = 3; }
+            }
+            else if (type === 4) {
+                lvl.platforms.push({x:320, y:200, w:100, h:20, type:'static'}); 
+                lvl.teleporters.push({x: 150, y: 320, tx: 350, ty: 150}); 
+                lvl.buttons.push({id: 'A', x:355, y:190, w:30, h:10, type:'timed', time: Math.max(90, 150 - diff*6)}); 
+                lvl.door.req = ['A'];
+            }
+            else if (type === 5) {
+                lvl.platforms.push({x:200, y:360, w:400, h:100, type:'static'}); lvl.hazards = [];
+                lvl.buttons.push({id: 'A', x: 280, y:350, w:30, h:10, type:'toggle'}, {id: 'B', x: 480, y:350, w:30, h:10, type:'toggle'});
+                lvl.door.req = ['B', 'A']; lvl.door.ordered = true;
+                if(diff > 3) { lvl.buttons.push({id: 'C', x: 380, y:350, w:30, h:10, type:'toggle'}); lvl.door.req = ['C', 'A', 'B']; }
+            }
+            else if (type === 6) {
+                lvl.platforms.push({x:200, y:360, w:400, h:100, type:'static'}); lvl.hazards = [];
+                lvl.hazards.push({x:280,y:310,w:30,h:50,color:'red', type:'movingH', startX:280, endX:380, speed:1.8+(diff*0.15), req:null});
+                lvl.hazards.push({x:450,y:310,w:30,h:50,color:'red', type:'movingH', startX:450, endX:550, speed:-(2.0+(diff*0.15)), req:null});
+                lvl.door.req = [];
+            }
+
+            if ((i + 1) % 20 === 0) {
+                lvl.title = `BOSS LEVEL ${i+1}`; lvl.sub = "ECHO PROTOCOL";
+                lvl.platforms = [{x:0,y:400,w:180,h:50, type:'static'}, {x:250,y:300,w:120,h:20, type:'static'}, {x:420,y:200,w:120,h:20, type:'static'}, {x:600,y:400,w:200,h:50, type:'static'}]; 
+                lvl.buttons = [{id: 'A', x:120, y:390, w:30, h:10, type:'hold'}, {id: 'B', x:460, y:190, w:30, h:10, type:'hold'}]; 
+                lvl.door = {x:700, y:320, w:60, h:80, req:['A','B'], reqKeys: 1}; 
+                lvl.lasers = [{x:320, y:100, w:10, h:200, req:['A']}]; 
+                lvl.teleporters = [{x: 300, y: 260, tx: 50, ty: 200}]; 
+                lvl.hazards = [{x:180,y:430,w:420,h:20,color:'#ef4444'}]; 
+                
+                let bossSpikeWidth = Math.min(80, 30 + (diff * 10));
+                lvl.spikes = [{x:580, y:400, w:bossSpikeWidth, h:30}]; 
+                
+                lvl.keys = [{x:460,y:100}]; 
+                lvl.hint = "Keys, Portals, Echoes. Flawless execution required.";
+            }
+            levelData.push(lvl);
+        }
+
+        levelData.push({ 
+            theme: 'void', title: "LEVEL 200", sub: "THE GRAND FINALE", 
+            start: {x: 50, y: 340}, 
+            platforms: [{x:0,y:400,w:150,h:50, type:'static'}, {x:200,y:300,w:100,h:20, type:'movingV', startY:300, endY:150, speed:1.8}, {x:350,y:150,w:100,h:20, type:'static'}, {x:500,y:250,w:80,h:20, type:'static'}, {x:650,y:400,w:150,h:50, type:'static'}], 
+            buttons: [{id: 'A', x:385, y:140, w:30, h:10, type:'timed', time:150}, {id: 'B', x:525, y:240, w:30, h:10, type:'toggle'}], 
+            door: {x:720, y:320, w:60, h:80, req:['A','B'], reqKeys: 3}, 
+            lasers: [{x:250, y:50, w:10, h:400, req:['B']}, {x:500, y:100, w:10, h:200, req:['A']}], 
+            blocks: [], teleporters: [{x: 80, y: 150, tx: 385, ty: 50}], 
+            hazards: [{x:150,y:430,w:500,h:20,color:'#1e1b4b'}], spikes: [{x:350,y:150,w:100,h:30}], 
+            keys: [{x:220, y:100}, {x:400, y:50}, {x:530, y:200}], 
+            hint: "The absolute limit. Time your jumps, grab the keys, and synchronize everything.", hintPaths: [] 
+        });
+    }
+    generateLevels();
+
+    // --- LEVEL PAGINATION LOGIC ---
+    const LEVELS_PER_PAGE = 30;
+    let currentLevelPage = 0;
+
+    function showScreen(screenId) { 
+        document.querySelectorAll('.screen, #screen-game').forEach(s => s.classList.remove('active')); 
+        document.getElementById(screenId).classList.add('active'); 
+        updateGemsUI(); 
+    }
+
+    function showLevelScreen() {
+        updateGemsUI(); 
+        renderLevelGrid();
+        showScreen('screen-levels');
+    }
+
+    function renderLevelGrid() {
+        const grid = document.getElementById('level-grid');
+        grid.innerHTML = '';
+        
+        let startIdx = currentLevelPage * LEVELS_PER_PAGE;
+        let endIdx = Math.min(startIdx + LEVELS_PER_PAGE, TOTAL_LEVELS);
+        
+        document.getElementById('level-page-title').textContent = `${startIdx + 1} TO ${endIdx}`;
+
+        for(let i = startIdx; i < endIdx; i++) {
+            const btn = document.createElement('button');
+            if (i <= maxUnlockedLevel) {
+                btn.className = 'lvl-btn unlocked'; btn.innerHTML = `${i + 1}`; btn.onclick = () => startGame(i);
+            } else {
+                btn.className = 'lvl-btn locked'; 
+                btn.innerHTML = `🔒<div style="font-size:16px; margin-top:4px;">${i + 1}</div>`;
+            }
+            grid.appendChild(btn);
+        }
+
+        document.getElementById('btn-prev-page').style.visibility = currentLevelPage > 0 ? 'visible' : 'hidden';
+        document.getElementById('btn-next-page').style.visibility = currentLevelPage < Math.ceil(TOTAL_LEVELS/LEVELS_PER_PAGE) - 1 ? 'visible' : 'hidden';
+    }
+
+    function changeLevelPage(direction) {
+        let maxPage = Math.ceil(TOTAL_LEVELS / LEVELS_PER_PAGE) - 1;
+        let newPage = currentLevelPage + direction;
+        
+        if (newPage < 0 || newPage > maxPage) return; 
+        
+        currentLevelPage = newPage;
+        playSound('button');
+        renderLevelGrid();
+    }
+
+    // --- GAME ENGINE CORE ---
+    let frameCount = 0; let gameState = 'menu'; let echoes = []; let currentRun = []; let currentLevelIdx = 0;
+    
+    // Original physics restored completely
+    let player = { x: 0, y: 0, w: 20, h: 36, vx: 0, vy: 0, jumpPower: -14, gravity: 0.7, grounded: false, coyoteTimer: 0, onPlatform: null, teleportCooldown: 0 };
+    const keys = { left: false, right: false, jump: false, jumpPressed: false };
+    let currentLevel = null; let particles = []; let deathParticles = []; let confettiParticles = [];
+    let sequencePressed = [];
+
+    function initParticles() { particles = Array.from({length: 40}).map(() => ({ x: Math.random()*logicalWidth, y: Math.random()*logicalHeight, s: Math.random()*2+0.5, speed: Math.random()*0.5+0.1 })); }
+
+    function loadLevel(idx) {
+        currentLevelIdx = idx;
+        currentLevel = JSON.parse(JSON.stringify(levelData[idx])); 
+        document.getElementById('ui-lvl-title').textContent = currentLevel.title;
+        document.getElementById('btn-next-level').style.display = (idx < levelData.length - 1) ? 'block' : 'none';
+        echoes = []; hintActive = false; sequencePressed = []; deathParticles = []; confettiParticles = []; resetPlayer(); updateGemsUI();
+    }
+
+    function startGame(idx) {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        showScreen('screen-game');
+        document.querySelectorAll('.overlay-dim').forEach(el => el.classList.add('hidden'));
+        if(settings.gfx) initParticles();
+        loadLevel(idx); gameState = 'playing';
+        if(!gameLoopId) loop(); 
+    }
+    function nextLevel() { if(currentLevelIdx + 1 < levelData.length) startGame(currentLevelIdx + 1); }
+
+    function resetPlayer() {
+        if (levelData[currentLevelIdx]) {
+            currentLevel = JSON.parse(JSON.stringify(levelData[currentLevelIdx]));
+            
+            // Buttons attaching logic
+            currentLevel.buttons.forEach(b => {
+                let attachedIdx = currentLevel.platforms.findIndex(p => b.x + b.w >= p.x && b.x <= p.x + p.w && Math.abs((b.y + b.h) - p.y) <= 5);
+                if (attachedIdx !== -1) { b.parentIndex = attachedIdx; b.offsetX = b.x - currentLevel.platforms[attachedIdx].x; b.offsetY = b.y - currentLevel.platforms[attachedIdx].y; }
+            });
+        }
+
+        player.x = currentLevel.start.x; player.y = currentLevel.start.y;
+        player.vx = 0; player.vy = 0; player.coyoteTimer = 0; player.onPlatform = null; player.teleportCooldown = 0;
+        currentRun = []; frameCount = 0; keys.left = false; keys.right = false; keys.jump = false; keys.jumpPressed = false;
+        deathParticles = []; if(hintActive) hintProgress = 0; sequencePressed = [];
+    }
+
+    function createDeathParticles(x, y) { for(let i=0; i<30; i++) { deathParticles.push({ x: x+10, y: y+18, vx: (Math.random()-0.5)*15, vy: (Math.random()-1)*15, life: 1 }); } }
+    function createConfetti() { for(let i=0; i<100; i++) { confettiParticles.push({ x: Math.random()*logicalWidth, y: -20, vx: (Math.random()-0.5)*5, vy: Math.random()*5+2, color: `hsl(${Math.random()*360}, 100%, 50%)` }); } }
+
+    function triggerDeath(reason = "You died!") {
+        if (gameState === 'dead_anim' || gameState === 'dead') return; 
+        playSound('die'); keys.left = false; keys.right = false; keys.jump = false; 
+        document.getElementById('death-reason').textContent = reason;
+        
+        gameState = 'dead_anim';
+        createDeathParticles(player.x, player.y);
+        canvas.className = 'shake'; setTimeout(() => canvas.className='shake2', 50); setTimeout(() => canvas.className='', 100);
+        
+        setTimeout(() => {
+            gameState = 'dead';
+            document.getElementById('overlay-death').classList.remove('hidden');
+            setTimeout(() => { document.getElementById('overlay-death').classList.add('hidden'); resetPlayer(); gameState = 'playing'; }, 1500); 
+        }, 1000); 
+    }
+
+    const handleEchoBtn = (e) => { if(e) e.preventDefault(); if (gameState !== 'playing') return; if (currentRun.length > 5) echoes.push([...currentRun]); playSound('jump'); resetPlayer(); };
+    document.getElementById('btn-restart-echo').addEventListener('touchstart', handleEchoBtn, {passive: false}); document.getElementById('btn-restart-echo').addEventListener('mousedown', handleEchoBtn);
+    const handleClearBtn = (e) => { if(e) e.preventDefault(); if (gameState !== 'playing') return; echoes = []; playSound('clear'); resetPlayer(); };
+    document.getElementById('btn-clear-echoes').addEventListener('touchstart', handleClearBtn, {passive: false}); document.getElementById('btn-clear-echoes').addEventListener('mousedown', handleClearBtn);
+
+    function pauseGame() { if(gameState === 'playing') { gameState = 'paused'; document.getElementById('overlay-pause').classList.remove('hidden'); } }
+    function resumeGame() { gameState = 'playing'; document.getElementById('overlay-pause').classList.add('hidden'); keys.left = false; keys.right = false; }
+    function quitToMenu() { gameState = 'menu'; showScreen('screen-menu'); }
+
+    const bindKey = (key, state) => {
+        if (gameState !== 'playing') return;
+        if (key === 'ArrowLeft' || key === 'a') keys.left = state;
+        if (key === 'ArrowRight' || key === 'd') keys.right = state;
+        if (key === 'ArrowUp' || key === 'w' || key === ' ') { if (state && !keys.jumpPressed) { keys.jumpPressed = true; keys.jump = true; } else if (!state) { keys.jumpPressed = false; keys.jump = false; } }
+    };
+    window.addEventListener('keydown', e => bindKey(e.key, true)); window.addEventListener('keyup', e => bindKey(e.key, false));
+
+    const addTouch = (id, prop) => {
+        const btn = document.getElementById(id);
+        const setTrue = (e) => { e.preventDefault(); if(audioCtx.state === 'suspended') audioCtx.resume(); if(gameState !== 'playing') return; if(prop === 'jump' && !keys.jumpPressed) { keys.jumpPressed = true; keys.jump = true; } else if (prop !== 'jump') { keys[prop] = true; } };
+        const setFalse = (e) => { e.preventDefault(); if(prop === 'jump') { keys.jumpPressed = false; keys.jump = false; } else { keys[prop] = false; } };
+        
+        btn.addEventListener('touchstart', setTrue, {passive: false});
+        btn.addEventListener('touchend', setFalse, {passive: false});
+        btn.addEventListener('touchcancel', setFalse, {passive: false});
+        btn.addEventListener('mousedown', setTrue);
+        btn.addEventListener('mouseup', setFalse);
+        btn.addEventListener('mouseleave', setFalse);
+    };
+    addTouch('btn-left', 'left'); addTouch('btn-right', 'right'); addTouch('btn-jump', 'jump');
+
+    function checkCol(r1, r2, isButton = false) { let margin = isButton ? 4 : 0; return r1.x < r2.x + r2.w + margin && r1.x + r1.w > r2.x - margin && r1.y < r2.y + r2.h + margin && r1.y + r1.h > r2.y - margin; }
+    function checkSpikeCol(r1, spike) { let shrink = 4; return r1.x < spike.x + spike.w - shrink && r1.x + r1.w > spike.x + shrink && r1.y < spike.y + spike.h && r1.y + r1.h > spike.y + spike.h - 15; }
+
+    function update() {
+        if (gameState === 'dead_anim') { deathParticles.forEach(p => { p.x += p.vx; p.vy += 0.5; p.y += p.vy; p.life -= 0.02; }); deathParticles = deathParticles.filter(p => p.life > 0); return; }
+        if (gameState === 'win') { confettiParticles.forEach(p => { p.x += p.vx; p.vy += 0.1; p.y += p.vy; }); return; }
+        if (gameState !== 'playing' || !currentLevel) return;
+
+        currentLevel.platforms.forEach(p => {
+            let reqMet = true;
+            if (p.req) { 
+                let reqs = Array.isArray(p.req) ? p.req : [p.req];
+                reqs.forEach(reqId => { let btn = currentLevel.buttons.find(b => b.id === reqId); if(btn && !btn.pressed) reqMet = false; });
+            }
+            p.active = reqMet; 
+
+            if (p.active) {
+                if (p.type === 'movingH') { p.x += p.speed; if (p.x > p.endX || p.x < p.startX) p.speed *= -1; } 
+                else if (p.type === 'movingV') { p.y -= p.speed; if (p.y < p.endY || p.y > p.startY) p.speed *= -1; }
+            }
+        });
+
+        currentLevel.buttons.forEach(b => {
+            if (b.parentIndex !== undefined && b.parentIndex !== -1) {
+                let p = currentLevel.platforms[b.parentIndex];
+                b.x = p.x + b.offsetX;
+                b.y = p.y + b.offsetY;
+            }
+        });
+
+        currentLevel.buttons.forEach(b => {
+            let wasPressed = b.pressed; let isCurrentlyTouched = false;
+            if(checkCol(player, b, true)) isCurrentlyTouched = true;
+            echoes.forEach(echo => { let f = Math.min(frameCount, echo.length - 1); if (f >= 0 && checkCol({ x: echo[f].x, y: echo[f].y, w: player.w, h: player.h }, b, true)) isCurrentlyTouched = true; });
+            if (currentLevel.blocks) currentLevel.blocks.forEach(block => { if(checkCol(block, b, true)) isCurrentlyTouched = true; });
+
+            if (b.type === 'hold') b.pressed = isCurrentlyTouched;
+            else if (b.type === 'toggle') { if (isCurrentlyTouched && !wasPressed) b.pressed = !b.pressed; } 
+            else if (b.type === 'timed') { if (isCurrentlyTouched) { b.pressed = true; b.timer = b.time; } else if (b.timer > 0) { b.timer--; b.pressed = true; } else { b.pressed = false; } }
+
+            if(b.pressed && !wasPressed) { playSound('button'); if(!sequencePressed.includes(b.id)) sequencePressed.push(b.id); }
+            if(!b.pressed && wasPressed) { sequencePressed = sequencePressed.filter(id => id !== b.id); } 
+        });
+
+        player.vx = keys.left ? -settings.speed : (keys.right ? settings.speed : 0);
+        if (player.onPlatform && player.onPlatform.type === 'movingH') player.x += player.onPlatform.speed;
+        player.x += player.vx;
+        if(player.x < 0) player.x = 0; if(player.x + player.w > logicalWidth) player.x = logicalWidth - player.w;
+
+        if (currentLevel.blocks) {
+            currentLevel.blocks.forEach(block => {
+                if (checkCol(player, block)) { if (player.vx > 0) block.x = player.x + player.w; else if (player.vx < 0) block.x = player.x - block.w; }
+                if (block.x < 0) block.x = 0; 
+                if (block.x + block.w > logicalWidth) block.x = logicalWidth - block.w;
+            });
+        }
+
+        if (player.grounded) player.coyoteTimer = 8; else player.coyoteTimer--; 
+        
+        if (keys.jump && player.coyoteTimer > 0) { 
+            player.vy = player.jumpPower; player.coyoteTimer = 0; 
+            player.grounded = false; player.onPlatform = null; playSound('jump'); keys.jump = false; 
+        }
+        if (!keys.jumpPressed && player.vy < -5) { player.vy *= 0.6; } 
+
+        if (player.onPlatform && player.onPlatform.type === 'movingV') player.y -= player.onPlatform.speed;
+        
+        player.vy += player.gravity; player.y += player.vy;
+        player.grounded = false; player.onPlatform = null;
+
+        for (let p of currentLevel.platforms) {
+            if (p.active !== false && checkCol(player, p) && player.vy > 0 && player.y - player.vy + player.h <= p.y + 15) { 
+                player.y = p.y - player.h; player.vy = 0; player.grounded = true; player.onPlatform = p;
+            }
+        }
+        
+        if (currentLevel.blocks) {
+            for (let block of currentLevel.blocks) {
+                if (checkCol(player, block) && player.vy > 0 && player.y - player.vy + player.h <= block.y + 15) {
+                    player.y = block.y - player.h; player.vy = 0; player.grounded = true;
+                }
+            }
+            currentLevel.blocks.forEach(block => {
+                block.y += 5; 
+                for (let p of currentLevel.platforms) { if (p.active !== false && checkCol(block, p) && block.y + block.h >= p.y) { block.y = p.y - block.h; } }
+            });
+        }
+
+        if (currentLevel.teleporters) {
+            currentLevel.teleporters.forEach(t => {
+                let tRect = {x: t.x, y: t.y, w: 30, h: 40}; 
+                if(checkCol(player, tRect) && !player.teleportCooldown) {
+                    player.x = t.tx; player.y = t.ty; playSound('teleport'); player.teleportCooldown = 60; 
+                }
+            });
+        }
+        if(player.teleportCooldown > 0) player.teleportCooldown--;
+
+        if (currentLevel.keys) {
+            currentLevel.keys.forEach(k => {
+                if (!k.collected) {
+                    let keyRect = {x:k.x, y:k.y, w:15, h:15};
+                    let touched = checkCol(player, keyRect);
+                    if(!touched) { echoes.forEach(echo => { let f = Math.min(frameCount, echo.length - 1); if (f >= 0 && checkCol({ x: echo[f].x, y: echo[f].y, w: player.w, h: player.h }, keyRect)) touched = true; }); }
+                    if (touched) { k.collected = true; playSound('key'); }
+                }
+            });
+        }
+
+        if (currentLevel.hazards) { 
+            currentLevel.hazards.forEach(h => { 
+                if(h.req) {
+                    let reqMet = true; let reqs = Array.isArray(h.req) ? h.req : [h.req];
+                    reqs.forEach(reqId => { let btn = currentLevel.buttons.find(b => b.id === reqId); if(btn && !btn.pressed) reqMet = false; });
+                    h.active = !reqMet;
+                } else { h.active = true; }
+
+                if(h.active && h.type === 'movingH') { h.x += h.speed; if(h.x > h.endX || h.x < h.startX) h.speed *= -1; }
+                if(h.active && checkCol(player, h)) { triggerDeath("Killed by a hazard!"); return; } 
+            }); 
+        }
+        
+        if (currentLevel.spikes) { for (let s of currentLevel.spikes) { if (checkSpikeCol(player, s)) { triggerDeath("Impaled on spikes!"); return; } } }
+
+        if (currentLevel.lasers) {
+            currentLevel.lasers.forEach(laser => {
+                let reqMet = true;
+                if (laser.req && laser.req.length > 0) { laser.req.forEach(reqId => { let btn = currentLevel.buttons.find(b => b.id === reqId); if(btn && !btn.pressed) reqMet = false; }); } else { reqMet = false; }
+                laser.active = !reqMet; 
+                if (laser.active && checkCol(player, laser)) { triggerDeath("Burned by a laser!"); return; } 
+            });
+        }
+
+        let door = currentLevel.door; let doorOpen = true;
+        if (door) {
+            if (door.req && door.req.length > 0) {
+                if (door.ordered) { doorOpen = (sequencePressed.length >= door.req.length) && door.req.every((val, index) => val === sequencePressed[index]); } 
+                else { door.req.forEach(reqId => { let btn = currentLevel.buttons.find(b => b.id === reqId); if(btn && !btn.pressed) doorOpen = false; }); }
+            }
+            if (door.reqKeys) {
+                let collectedCount = currentLevel.keys ? currentLevel.keys.filter(k=>k.collected).length : 0;
+                if (collectedCount < door.reqKeys) doorOpen = false;
+            }
+        }
+
+        if (door && doorOpen && checkCol(player, door)) {
+            gameState = 'win'; playSound('win'); createConfetti(); hintActive = false;
+            
+            if(currentLevelIdx === maxUnlockedLevel) {
+                playerGems += 5; updateGemsUI();
+                document.getElementById('win-bonus-text').textContent = "+5 💎 NEON GEMS EARNED!";
+                if (maxUnlockedLevel < TOTAL_LEVELS - 1) { maxUnlockedLevel++; }
+            } else {
+                document.getElementById('win-bonus-text').textContent = "LEVEL CLEARED AGAIN!";
+            }
+            saveGame(); 
+            setTimeout(() => { document.getElementById('overlay-win').classList.remove('hidden'); }, 1000); 
+        }
+
+        currentRun.push({ x: player.x, y: player.y, vx: player.vx });
+        frameCount++; 
+        
+        if (hintActive) hintProgress += 1.5; 
+    }
+
+    // --- RENDERING ---
+    function getGhostPos(path, progress) {
+        if (!path || path.length === 0) return null;
+        
+        let framesPerSegment = 30; 
+        let totalPathFrames = (path.length - 1) * framesPerSegment; 
+        let stayFrames = 150; 
+        let p = progress % (totalPathFrames + stayFrames); 
+        
+        if (p >= totalPathFrames) { return { x: path[path.length-1].x, y: path[path.length-1].y, vx: 0, jump: false, isEnd: true }; }
+        
+        let segIdx = Math.floor(p / framesPerSegment); 
+        let t = (p % framesPerSegment) / framesPerSegment;
+        
+        let p1 = path[segIdx]; let p2 = path[segIdx + 1]; 
+        let dx = p2.x - p1.x; let dy = p2.y - p1.y; 
+        let arc = p2.jump ? Math.sin(t * Math.PI) * -80 : 0; 
+        
+        return { x: p1.x + dx * t, y: p1.y + dy * t + arc, vx: dx * 0.05, jump: p2.jump, isEnd: false };
+    }
+
+    function drawGlowRect(x, y, w, h, color, blur) { ctx.fillStyle = color; ctx.shadowBlur = blur; ctx.shadowColor = color; ctx.fillRect(x, y, w, h); ctx.shadowBlur = 0; }
+    
+    function drawMetallicPlatform(p) {
+        if (p.active === false) return; 
+        if (images.platform.complete && images.platform.naturalHeight !== 0) {
+            ctx.drawImage(images.platform, p.x, p.y, p.w, p.h);
+        } else {
+            let grad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.h); 
+            if(p.type === 'movingH' || p.type === 'movingV') { grad.addColorStop(0, '#8b5cf6'); grad.addColorStop(0.1, '#4c1d95'); grad.addColorStop(1, '#020617'); } 
+            else { grad.addColorStop(0, '#475569'); grad.addColorStop(0.1, '#1e293b'); grad.addColorStop(1, '#020617'); }
+            ctx.fillStyle = grad; ctx.fillRect(p.x, p.y, p.w, p.h); 
+            ctx.fillStyle = (p.type === 'movingH' || p.type === 'movingV') ? '#a78bfa' : '#64748b'; ctx.fillRect(p.x, p.y, p.w, 2); 
+            ctx.fillStyle = '#0f172a'; ctx.fillRect(p.x, p.y + p.h - 2, p.w, 2); 
+            ctx.fillStyle = '#0f172a'; for(let i = 15; i < p.w; i += 40) ctx.fillRect(p.x + i, p.y + p.h/2 - 4, 4, 8); 
+        }
+    }
+
+    function drawSpikes(s) {
+        if (images.spike.complete && images.spike.naturalHeight !== 0) { ctx.drawImage(images.spike, s.x, s.y, s.w, s.h); } 
+        else { ctx.fillStyle = '#94a3b8'; let count = Math.floor(s.w / 15); for(let i=0; i<count; i++) { ctx.beginPath(); ctx.moveTo(s.x + (i*15), s.y + s.h); ctx.lineTo(s.x + (i*15) + 7.5, s.y); ctx.lineTo(s.x + (i*15) + 15, s.y + s.h); ctx.fill(); } }
+    }
+
+    function drawRealisticHuman(x, y, w, h, type, vx, time, customAlpha = null) {
+        let imgAsset = type === 0 ? images.player : images.playerEcho;
+        if (imgAsset.complete && imgAsset.naturalHeight !== 0) {
+            ctx.save(); if (customAlpha !== null) { ctx.globalAlpha = customAlpha; } else if (type === 1) { ctx.globalAlpha = 0.6; }
+            if (vx < -0.1) { ctx.translate(x + w, y); ctx.scale(-1, 1); ctx.drawImage(imgAsset, 0, 0, w, h); } else { ctx.drawImage(imgAsset, x, y, w, h); } ctx.restore();
+        } else {
+            ctx.save(); let cx = x + w / 2;
+            let suit = type === 1 ? 'rgba(14, 165, 233, 0.4)' : (type === 2 ? 'rgba(250, 204, 21, 0.5)' : '#1e293b');
+            let glow = type === 1 ? '#38bdf8' : (type === 2 ? '#fef08a' : '#0ea5e9');
+            let spd = Math.abs(vx) > 0.1 ? 0.3 : 0, rC = time * spd;
+            let lL = Math.sin(rC)*30, lR = Math.sin(rC+Math.PI)*30, aL = Math.sin(rC+Math.PI)*40, aR = Math.sin(rC)*40;
+            const drawLimb = (sx, sy, len, ang, wid) => { ctx.beginPath(); ctx.moveTo(sx, sy); let ex = sx + Math.sin(ang*Math.PI/180)*len, ey = sy + Math.cos(ang*Math.PI/180)*len; ctx.lineTo(ex, ey); ctx.lineWidth = wid; ctx.lineCap = 'round'; ctx.stroke(); return {x: ex, y: ey}; };
+
+            if(type === 0) { ctx.shadowBlur = 15; ctx.shadowColor = 'rgba(0,0,0,0.8)'; }
+            if (customAlpha !== null) ctx.globalAlpha = customAlpha; 
+            
+            ctx.strokeStyle = suit; if (customAlpha === null) ctx.globalAlpha = type === 0 ? 0.6 : 1;
+            
+            let kR = drawLimb(cx, y+18, 10, lR, 6); drawLimb(kR.x, kR.y, 10, lR+(Math.sin(rC+Math.PI)>0?20:0), 4);
+            let eR = drawLimb(cx, y+10, 8, aR, 5); drawLimb(eR.x, eR.y, 8, aR-30, 4);
+            
+            if (customAlpha === null) ctx.globalAlpha = 1; 
+            
+            ctx.beginPath(); ctx.moveTo(cx-4, y+8); ctx.lineTo(cx+4, y+8); ctx.lineTo(cx+3, y+20); ctx.lineTo(cx-3, y+20); ctx.closePath(); ctx.fillStyle = suit; ctx.fill();
+            let kL = drawLimb(cx, y+18, 10, lL, 6); drawLimb(kL.x, kL.y, 10, lL+(Math.sin(rC)>0?20:0), 4);
+            let eL = drawLimb(cx, y+10, 8, aL, 5); drawLimb(eL.x, eL.y, 8, aL-30, 4);
+            ctx.beginPath(); ctx.arc(cx+(vx*0.5), y+3, 5, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 10; ctx.shadowColor = glow; ctx.fillStyle = glow; ctx.fillRect(cx+(vx>=0?1:-4)+(vx*0.5), y+1, 4, 2); 
+            ctx.beginPath(); ctx.arc(cx, y+12, 2, 0, Math.PI*2); ctx.fill(); ctx.restore();
+        }
+    }
+
+    function draw() {
+        if(gameState === 'menu' || !currentLevel) return;
+
+        if (images.background.complete && images.background.naturalHeight !== 0) {
+            ctx.drawImage(images.background, 0, 0, logicalWidth, logicalHeight);
+        } else {
+            let bg = ctx.createRadialGradient(logicalWidth/2, logicalHeight/2, 50, logicalWidth/2, logicalHeight/2, 600); 
+            if(currentLevel.theme === 'acid') { bg.addColorStop(0, '#064e3b'); bg.addColorStop(1, '#022c22'); }
+            else if(currentLevel.theme === 'lava') { bg.addColorStop(0, '#7f1d1d'); bg.addColorStop(1, '#450a0a'); }
+            else { bg.addColorStop(0, '#1e1b4b'); bg.addColorStop(1, '#000000'); } 
+            ctx.fillStyle = bg; ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+        }
+
+        if (settings.gfx) { ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; particles.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, Math.PI*2); ctx.fill(); if(gameState === 'playing') p.y -= p.speed; if(p.y < 0) p.y = logicalHeight; }); }
+
+        currentLevel.platforms.forEach(p => drawMetallicPlatform(p)); 
+        
+        if (currentLevel.hazards) {
+            currentLevel.hazards.forEach(h => { if(h.active === false) return; let bubble = Math.sin(frameCount * 0.1) * 2; drawGlowRect(h.x, h.y - bubble, h.w, h.h + bubble, h.color, 20); ctx.fillStyle = '#fff'; ctx.fillRect(h.x + (frameCount%h.w), h.y + 2, 10, 2); });
+        }
+        if (currentLevel.spikes) { currentLevel.spikes.forEach(s => drawSpikes(s)); }
+
+        let door = currentLevel.door; 
+        if (door) {
+            let doorOpen = true;
+            if (door.req && door.req.length > 0) {
+                if (door.ordered) doorOpen = (sequencePressed.length >= door.req.length) && door.req.every((val, i) => val === sequencePressed[i]);
+                else door.req.forEach(reqId => { let btn = currentLevel.buttons.find(b => b.id === reqId); if(btn && !btn.pressed) doorOpen = false; });
+            }
+            if (door.reqKeys) { let collectedCount = currentLevel.keys ? currentLevel.keys.filter(k=>k.collected).length : 0; if (collectedCount < door.reqKeys) doorOpen = false; }
+            
+            if (doorOpen && images.doorOpen.complete && images.doorOpen.naturalHeight !== 0) {
+                ctx.drawImage(images.doorOpen, door.x, door.y, door.w, door.h);
+            } else if (!doorOpen && images.doorClosed.complete && images.doorClosed.naturalHeight !== 0) {
+                ctx.drawImage(images.doorClosed, door.x, door.y, door.w, door.h);
+            } else {
+                let pg = ctx.createLinearGradient(door.x, door.y, door.x, door.y + door.h); 
+                let dColor = doorOpen ? 'rgba(34, 197, 94, 0.4)' : 'rgba(14, 165, 233, 0)';
+                let dGlow = doorOpen ? '#22c55e' : '#0ea5e9';
+                pg.addColorStop(0, 'rgba(14, 165, 233, 0)'); pg.addColorStop(0.5, dColor); pg.addColorStop(1, 'rgba(14, 165, 233, 0)'); 
+                drawGlowRect(door.x, door.y, door.w, door.h, pg, 0); 
+                ctx.strokeStyle = dGlow; ctx.lineWidth = 2; ctx.shadowBlur = 15; ctx.shadowColor = dGlow; ctx.strokeRect(door.x, door.y, door.w, door.h); ctx.shadowBlur = 0;
+                ctx.fillStyle = '#fff'; ctx.font = '10px Rajdhani'; ctx.fillText(doorOpen?"OPEN":"LOCKED", door.x+10, door.y-5);
+            }
+        }
+
+        if (currentLevel.teleporters) {
+            currentLevel.teleporters.forEach(t => {
+                drawGlowRect(t.x, t.y, 30, 40, 'rgba(168, 85, 247, 0.3)', 15);
+                ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 2; ctx.strokeRect(t.x, t.y, 30, 40);
+                ctx.fillStyle = '#d8b4fe'; ctx.beginPath(); ctx.arc(t.x+15, t.y+20, 5 + Math.sin(frameCount*0.2)*5, 0, Math.PI*2); ctx.fill();
+            });
+        }
+
+        if (currentLevel.keys) {
+            currentLevel.keys.forEach(k => {
+                if (!k.collected) {
+                    ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.moveTo(k.x+7.5, k.y); ctx.lineTo(k.x+15, k.y+7.5); ctx.lineTo(k.x+7.5, k.y+15); ctx.lineTo(k.x, k.y+7.5); ctx.closePath();
+                    ctx.shadowBlur = 15; ctx.shadowColor = '#eab308'; ctx.fill(); ctx.shadowBlur = 0;
+                }
+            });
+        }
+
+        if (currentLevel.blocks) {
+            currentLevel.blocks.forEach(b => {
+                if (images.block.complete && images.block.naturalHeight !== 0) {
+                    ctx.drawImage(images.block, b.x, b.y, b.w, b.h);
+                } else {
+                    ctx.fillStyle = '#475569'; ctx.fillRect(b.x, b.y, b.w, b.h);
+                    ctx.strokeStyle = '#94a3b8'; ctx.lineWidth=2; ctx.strokeRect(b.x, b.y, b.w, b.h);
+                    ctx.fillStyle = '#1e293b'; ctx.fillRect(b.x+5, b.y+5, b.w-10, b.h-10); 
+                }
+            });
+        }
+
+        currentLevel.buttons.forEach(b => { 
+            let bH = b.pressed ? 4 : 10, bY = b.y + (10 - bH);
+            let bC = b.pressed ? '#22c55e' : (b.type==='toggle' ? '#eab308' : (b.type==='timed' ? '#3b82f6' : '#ec4899')); 
+            ctx.fillStyle = '#1e293b'; ctx.fillRect(b.x - 2, b.y + 8, b.w + 4, 4); drawGlowRect(b.x, bY, b.w, bH, bC, 10); 
+            ctx.fillStyle = '#fff'; ctx.font = '10px Arial'; ctx.fillText(b.id, b.x+10, b.y+15);
+        });
+
+        if (currentLevel.lasers) {
+            currentLevel.lasers.forEach(laser => { 
+                if (laser.active) { drawGlowRect(laser.x - 5, laser.y, 20, laser.h, 'rgba(239, 68, 68, 0.2)', 30); drawGlowRect(laser.x, laser.y, laser.w, laser.h, 'rgba(239, 68, 68, 0.8)', 10); drawGlowRect(laser.x + 3, laser.y, 4, laser.h, '#fff', 5); } 
+            });
+        }
+
+        echoes.forEach(e => { let f = Math.min(frameCount, e.length - 1); if (f >= 0) drawRealisticHuman(e[f].x, e[f].y, player.w, player.h, 1, e[f].vx, f); });
+        
+        if (hintActive && currentLevel.hintPaths) {
+            currentLevel.hintPaths.forEach((path, idx) => {
+                let pos = getGhostPos(path, hintProgress);
+                if (pos) {
+                    drawRealisticHuman(pos.x, pos.y, player.w, player.h, 2, pos.vx, hintProgress);
+                    ctx.fillStyle = '#fef08a'; ctx.font = 'bold 14px Rajdhani'; ctx.textAlign = 'center'; 
+                    let label = pos.isEnd ? "TARGET" : "FOLLOW"; 
+                    ctx.shadowBlur = 5; ctx.shadowColor = '#000'; ctx.fillText(label, pos.x + player.w/2, pos.y - 15); ctx.shadowBlur = 0;
+                }
+            });
+        }
+        
+        if (gameState === 'playing' && settings.gfx && Math.abs(player.vx) > 0.5) {
+            let trailLength = Math.min(4, currentRun.length);
+            for(let i = 1; i < trailLength; i++) {
+                let pFrame = currentRun[currentRun.length - i * 2]; 
+                if (pFrame) drawRealisticHuman(pFrame.x, pFrame.y, player.w, player.h, 0, pFrame.vx, frameCount - i, 0.4 - (i * 0.08));
+            }
+        }
+
+        if (gameState === 'dead_anim') { deathParticles.forEach(p => { if(p.life > 0) { ctx.fillStyle = `rgba(14, 165, 233, ${p.life})`; ctx.fillRect(p.x, p.y, 4, 4); } }); } 
+        else if (gameState === 'win') { drawRealisticHuman(player.x, player.y, player.w, player.h, 0, 0, frameCount); confettiParticles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 6, 6); }); } 
+        else if (gameState !== 'dead') { drawRealisticHuman(player.x, player.y, player.w, player.h, 0, player.vx, frameCount); }
+    }
+
+    function loop() { update(); draw(); gameLoopId = requestAnimationFrame(loop); }
+</script>
+</body>
+</html>
